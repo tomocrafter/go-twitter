@@ -3,7 +3,7 @@ package twitter
 // WebHookRequest is sent from twitter server as webhook payload.
 // https://developer.twitter.com/en/docs/accounts-and-users/subscribe-account-activity/guides/account-activity-data-objects
 type AccountActivityPayload struct {
-	ForUserID           string               `json:"for_user_id"`
+	ForUserID           *string              `json:"for_user_id"`
 	IsBlockedBy         *bool                `json:"is_blocked_by"`
 	UserHasBlocked      *bool                `json:"user_has_blocked"`
 	Users               map[string]User      `json:"users"`
