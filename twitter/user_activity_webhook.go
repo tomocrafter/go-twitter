@@ -114,23 +114,27 @@ func CreateWebhookHandler(handler chan interface{}) (func(*gin.Context), error) 
 	return func(c *gin.Context) {
 		var req accountActivityPayload
 		if err := c.BindJSON(req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err})
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err})
 			handler <- fmt.Errorf("an error occurred while parsing json: %+v", err)
 			return
 		}
 
-		if req.ForUserID == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			done := make(chan interface{})
+		defer func() {
+			c.AbortWithStatus(http.StatusNoContent)
+		}()
 
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						handler <- fmt.Errorf("error occurred while handling webhook: %s", r)
-					}
-				}()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		done := make(chan interface{})
 
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					handler <- fmt.Errorf("error occurred while handling webhook: %s", r)
+				}
+			}()
+
+			if req.ForUserID == nil {
 				for _, e := range req.TweetCreateEvents {
 					handler <- e
 				}
@@ -155,18 +159,17 @@ func CreateWebhookHandler(handler chan interface{}) (func(*gin.Context), error) 
 						req.Users,
 					}
 				}
-				if req.UserEvent != nil {
-					handler <- req.UserEvent.Revoke
-				}
-				close(done)
-			}()
-
-			select {
-			case <-ctx.Done(): // Timeout
-				handler <- errors.New("call to the webhook handler timed out")
-			case <-done:
-				return
+			} else if req.UserEvent != nil {
+				handler <- req.UserEvent.Revoke
 			}
+			close(done)
+		}()
+
+		select {
+		case <-ctx.Done(): // Timeout
+			handler <- errors.New("call to the webhook handler timed out")
+		case <-done:
+			return
 		}
 	}, nil
 }
