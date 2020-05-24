@@ -36,6 +36,11 @@ type accountActivityPayload struct {
 
 type TweetCreateEvent Tweet
 
+type DMEvent struct {
+	DirectMessageEvent
+	Users map[string]User
+}
+
 type DeleteEvent struct {
 	Status    Status `json:"status"`
 	Timestamp string `json:"timestamp_ms"`
@@ -145,7 +150,10 @@ func CreateWebhookHandler(handler chan interface{}) (func(*gin.Context), error) 
 					handler <- e
 				}
 				for _, e := range req.DirectMessageEvents {
-					handler <- e
+					handler <- DMEvent{
+						e,
+						req.Users,
+					}
 				}
 				if req.UserEvent != nil {
 					handler <- req.UserEvent.Revoke
